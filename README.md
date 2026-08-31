@@ -1,90 +1,198 @@
 # 🐧 Linux & SRE Troubleshooting Labs
 
-sadServers | Bash | Linux Diagnostics | Cron | Process Management
+<div align="center">
 
-Hands-on troubleshooting exercises solving real, broken Linux systems under time pressure. Each scenario is a live VM with something genuinely broken — no tutorials, no hints beyond what the platform provides. This repo documents the diagnosis process and fix for each one, not just the final answer.
+![SadServers](https://img.shields.io/badge/SadServers-Troubleshooting-00838F?style=for-the-badge)
+![Bash](https://img.shields.io/badge/Bash-Scripting-4EAA25?style=for-the-badge&logo=gnubash&logoColor=white)
+![Linux](https://img.shields.io/badge/Linux-Administration-FCC624?style=for-the-badge&logo=linux&logoColor=black)
+![Cron](https://img.shields.io/badge/Cron-Job%20Debugging-2E8B57?style=for-the-badge)
+![SRE](https://img.shields.io/badge/SRE-Site%20Reliability-0f172a?style=for-the-badge)
 
-🏅 Badge: SadServers – Beginner Show Image
+</div>
 
-🔎 Saint John — Runaway Log-Writing Process
+---
 
-Category: Process Management, Log Troubleshooting | Difficulty: Easy
+## 🌎 Project Overview
 
-The Problem
+**Linux & SRE Troubleshooting Labs** is a growing collection of hands-on troubleshooting exercises solved on live, ephemeral Linux VMs via [SadServers](https://sadservers.com). Each scenario starts broken with no tutorial and no starting hints beyond the platform's own clue system — the goal is real root cause analysis under time pressure, not following steps.
 
-A test program was continuously writing to /var/log/bad.log, filling up disk space. The program was no longer needed and had to be found and terminated — without deleting the log file itself.
+This repo documents the diagnosis process for each scenario, not just the final fix.
 
-Diagnosis
+### Core Focus Areas
 
-Used lsof (list open files) to identify exactly which process had the log file open:
+🐧 Linux Administration  
+🔎 Root Cause Analysis  
+⏱ Live Troubleshooting Under Time Pressure  
+📜 Process & Log Management  
+⏰ Cron & Job Scheduling  
+🛠 SRE / DevOps Practices  
 
-bash
+---
+
+# 🏛️ Troubleshooting Methodology
+
+Every scenario follows the same diagnostic approach:
+
+```
+                  SYMPTOM REPORTED
+                         |
+                  Reproduce & Observe
+                         |
+              --------------------------
+              |                        |
+        Check Processes           Check Schedules/Config
+        (lsof, ps, kill)          (crontab, service files)
+              |                        |
+              --------------------------
+                         |
+                Identify Root Cause(s)
+                         |
+                     Apply Fix
+                         |
+                 Verify & Validate
+```
+
+---
+
+# 🎯 Project Goals
+
+## 🔎 Live System Diagnosis
+- Identify which process is holding a file or port open
+- Trace the root cause of silent failures (not just visible symptoms)
+- Read and interpret cron entries, service files, and configuration
+
+---
+
+## ⚙️ Fix & Validate
+- Apply minimal, targeted fixes — favor graceful signals before force
+- Verify each fix against a defined success condition
+- Avoid destructive side effects (e.g., never deleting the log file itself)
+
+---
+
+## 📝 Documentation
+- Record the diagnosis path, not just the final command
+- Capture root cause and reasoning for every fix, including when there's more than one
+
+---
+
+# 🛠️ Technology Stack
+
+| Category | Technologies |
+|----------|-------------|
+| Platform | SadServers (live ephemeral Linux VMs) |
+| Operating System | Debian 11, Linux |
+| Scripting | Bash |
+| Process Management | lsof, ps, kill |
+| Scheduling | cron, crontab |
+| Diagnostics | Log analysis, root cause analysis |
+
+---
+
+# 📂 Repository Structure
+
+```
+linux-sre-troubleshooting-labs
+│
+├── 📁 saint-john
+│   └── writeup.md
+│
+├── 📁 alexandria
+│   └── writeup.md
+│
+├── 📁 documentation
+│   └── methodology.md
+│
+└── 📁 screenshots
+```
+
+---
+
+# ⚙️ Scenario Walkthroughs
+
+## 1. Saint John — Runaway Log-Writing Process
+**Category:** Process Management, Log Troubleshooting | **Difficulty:** Easy
+
+A test program was continuously writing to `/var/log/bad.log`, filling up disk space. It needed to be found and terminated — without deleting the log file.
+
+Diagnosis:
+```bash
 sudo lsof /var/log/bad.log
+```
+Identified the responsible process (`badlog.py`, PID 596) actively holding the file open.
 
-Output showed the process badlog.py (PID 596) actively holding the file open in write mode.
-
-Fix
-bash
+Fix:
+```bash
 sudo kill 596
+```
+Used a plain `kill` (SIGTERM) first to allow a clean exit, rather than immediately force-killing with `kill -9`.
 
-Used a plain kill (SIGTERM) rather than kill -9 (SIGKILL) first, to give the process a chance to exit cleanly rather than force-terminating it.
+Verification:
+```bash
+sudo lsof /var/log/bad.log   # no process holding the file open
+tail -f /var/log/bad.log     # file stopped growing
+```
 
-Verification
-bash
-sudo lsof /var/log/bad.log   # confirmed no process holding the file open
-tail -f /var/log/bad.log     # confirmed the file stopped growing
-Key Takeaway
+---
 
-lsof is the fastest way to answer "what process is touching this file right now" — essential for any live troubleshooting where a process is misbehaving against a specific file or port.
+## 2. Alexandria — The Vanishing Backups
+**Category:** Cron, Bash Scripting, Root Cause Analysis | **Difficulty:** Easy
 
-🔎 Alexandria — The Vanishing Backups
+A critical backup cron job had silently stopped working 3 days prior — no errors, no alert emails, and the cron service itself appeared healthy.
 
-Category: Cron, Bash Scripting, Root Cause Analysis | Difficulty: Easy
-
-The Problem
-
-A critical backup cron job had silently stopped working 3 days prior. The backup script (/opt/backup/backup.sh) should have been creating daily backups in /var/backups/daily/, but nothing new had been created. No error logs, no alert emails, and the cron service itself appeared healthy — making this a "silent failure" requiring deeper investigation.
-
-Diagnosis
-
-Checked the actual crontab entry rather than assuming the scheduler itself was broken:
-
-bash
+Diagnosis:
+```bash
 sudo crontab -l
-
-This revealed the real issue: the cron job was invoking /opt/backup/old_backup.sh — a script that no longer existed — instead of the current /opt/backup/backup.sh. Confirmed with:
-
-bash
 ls -l /opt/backup/
+```
+Found two independent root causes: the cron entry pointed to a renamed/nonexistent script (`old_backup.sh`) instead of the live one (`backup.sh`), and a stale `backup.lock` file from an earlier interrupted run was blocking every subsequent execution (the script exits immediately if the lock file exists). Alerting was also silently broken — `MAILTO` pointed to a non-existent address and output was redirected to `/dev/null`, which is why the failure produced no visible signal for 3 days.
 
-which showed backup.sh present and executable, but no old_backup.sh at all.
+Fix:
+```bash
+sudo crontab -e            # corrected old_backup.sh -> backup.sh
+sudo rm /opt/backup/backup.lock
+sudo /opt/backup/backup.sh # triggered manually to verify immediately
+```
 
-A second issue surfaced while reading the actual script: backup.sh checks for a backup.lock file at the start and immediately exits if one exists (to prevent concurrent runs), only removing it after a completed run. A stale backup.lock was already present — left over from an earlier interrupted execution — meaning even a correctly-pointed cron job would have continued to fail silently.
+Verification:
+```bash
+ls -l /var/backups/daily/   # fresh backup_<timestamp>.tar.gz confirmed
+```
 
-Also worth noting: MAILTO in the crontab was set to a non-existent address, and output was redirected to /dev/null — explaining why no error emails or logs ever appeared, even though the job had been failing for days.
+---
 
-Fix
-Corrected the crontab entry to point to the real script:
-bash
-   sudo crontab -e
-   # changed old_backup.sh -> backup.sh
-Removed the stale lock file blocking execution:
-bash
-   sudo rm /opt/backup/backup.lock
-Manually triggered a backup to verify immediately rather than waiting on the schedule:
-bash
-   sudo /opt/backup/backup.sh
-Verification
-bash
-ls -l /var/backups/daily/   # confirmed a fresh backup_<timestamp>.tar.gz was created
-Key Takeaway
+# 🔎 Engineering Highlights
 
-"No errors" doesn't mean "no problem" — a job can fail silently if its output is redirected to /dev/null and its alerting is misconfigured. This scenario had two independent root causes stacked on top of each other (wrong script path + stale lock file), which is a good reminder to keep investigating after finding the first plausible cause, rather than stopping at the first thing that looks wrong.
+### 🐧 Linux Troubleshooting
+✔ Diagnosed live process/file issues with `lsof`  
+✔ Used signal-based process termination (SIGTERM before SIGKILL)  
+✔ Verified every fix against a defined success condition  
 
-🛠️ Tools & Concepts Covered
+### ⏰ Cron & Job Scheduling
+✔ Diagnosed a silently failing cron job with no visible errors  
+✔ Identified two independent, stacked root causes  
+✔ Recognized misconfigured alerting (`MAILTO` + `/dev/null`) as the reason failures went unnoticed  
 
-lsof · kill / signal handling · crontab · cron job debugging · file locking patterns · log analysis · root cause analysis under time pressure
+### 📝 Root Cause Analysis
+✔ Didn't stop investigating after finding the first plausible cause  
+✔ Documented reasoning and diagnostic steps, not just the final commands  
 
-📌 More Scenarios Coming
+---
 
-This repo will grow as I work through more sadServers, TryHackMe, and HackTheBox exercises focused on Linux, DevOps, and SRE troubleshooting.
+# 🚧 Future Improvements
+
+Planned additions:
+- More SadServers scenarios (Medium difficulty)
+- TryHackMe SOC Level 1 path writeups
+- HackTheBox Academy modules
+- Screenshots/recordings of live troubleshooting sessions
+
+---
+
+# 👨‍💻 Author
+
+## Emmanuel Emile
+Cloud Operations | DevSecOps | Cloud Security
+
+🔗 GitHub  
+https://github.com/mannyit001-design
